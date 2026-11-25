@@ -53,8 +53,12 @@ def spelling(df, col):
     text = df[col].dropna().astype(str)
     return rows(text.groupby(text.str.strip().str.lower()).transform("nunique") > 1)
 
+DATE_FORMATS = ["%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%d.%m.%Y", "%d-%m-%Y", "%Y/%m/%d"]
+
 def bad_dates(df, col):
-    parsed = pd.to_datetime(df[col], format="%Y-%m-%d", errors="coerce")
+    # Use the date format that fits most values in this column, then list the values that do not fit it
+    tries = [pd.to_datetime(df[col], format=f, errors="coerce") for f in DATE_FORMATS]
+    parsed = max(tries, key=lambda t: t.notna().sum())
     return rows(df[col].notna() & parsed.isna())
 
 def too_young(df, col):
@@ -71,7 +75,7 @@ CHECKS = {
     "negative": (negative, "negative values"),
     "unusual": (unusual, "unusual values (may be correct)"),
     "spelling": (spelling, "rows with mixed spelling or spacing"),
-    "bad_dates": (bad_dates, "invalid dates (expected YYYY-MM-DD)"),
+    "bad_dates": (bad_dates, "dates that are invalid or in a different format"),
     "too_young": (too_young, "values under 18 (may be correct)"),
     "too_old": (too_old, "values over 100 (may be correct)"),
 }

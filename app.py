@@ -1,6 +1,7 @@
 """Ishu's DataCheck Bot: a web app that checks a CSV table and answers questions about it.
 Built by Iswarya Subburaj (Ishu), with AI assistance. Run with: streamlit run app.py
 """
+import base64
 import io
 import re
 
@@ -638,6 +639,165 @@ def read_table(content):
         raise ValueError("no rows")
     return table
 
+# ---------- Look and feel ----------
+
+# Original drawing: a girl robot checking a table with a magnifying glass
+ROBOT = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 190">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#4cc9ff"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs>
+<g stroke="url(#g)" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" fill="#4c2889">
+<path d="M32 50C8 58 4 92 18 112c3-14 10-20 20-24z"/>
+<path d="M114 50c24 8 28 42 14 62-3-14-10-20-20-24z"/>
+<g fill="#111a4a">
+<rect x="28" y="34" width="90" height="74" rx="32"/>
+<path d="M54 114h38l22 50H32z"/>
+<path d="M73 34V20" fill="none"/>
+<path d="M48 126L24 146M98 126l32-6" fill="none"/>
+<path d="M56 164v18M90 164v18" fill="none"/>
+</g>
+<path d="M34 55c8-22 52-30 76-8-18 2-30-2-38-12-6 12-20 20-38 20z"/>
+<path d="M102 34L86 22v24zM102 34l16-12v24z" fill="#7c3aed"/>
+<circle cx="102" cy="34" r="5" fill="#c4b5fd"/>
+</g>
+<circle cx="73" cy="15" r="6" fill="#c4b5fd"/>
+<g fill="#7ee7ff"><ellipse cx="55" cy="73" rx="8" ry="10"/><ellipse cx="91" cy="73" rx="8" ry="10"/></g>
+<g fill="#ffffff"><circle cx="58" cy="69" r="3"/><circle cx="94" cy="69" r="3"/></g>
+<path d="M47 66l-8-5M52 62l-4-7M99 66l8-5M94 62l4-7" stroke="#7ee7ff" stroke-width="3" stroke-linecap="round"/>
+<g fill="#8b5cf6" opacity=".75"><circle cx="43" cy="90" r="6"/><circle cx="103" cy="90" r="6"/></g>
+<path d="M62 91q11 10 22 0" fill="none" stroke="#c4b5fd" stroke-width="4" stroke-linecap="round"/>
+<path d="M73 147c-14-9-13-20-6-20 3 0 5 2 6 5 1-3 3-5 6-5 7 0 8 11-6 20z" fill="#7c3aed"/>
+<g fill="#111a4a" stroke="url(#g)" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+<rect x="130" y="118" width="80" height="62" rx="8"/>
+<path d="M130 138h80M130 159h80M157 118v62M183 118v62" fill="none" stroke-width="2"/>
+<circle cx="164" cy="96" r="30" fill="#4cc9ff" fill-opacity=".18"/>
+<path d="M142 116l-11 5" fill="none" stroke-width="7"/>
+</g>
+<path d="M153 97l8 8 15-17" fill="none" stroke="#7ee7ff" stroke-width="5" stroke-linecap="round"/>
+</svg>"""
+
+STYLE = """<style>
+.stApp { background: radial-gradient(circle at 75% 5%, #2b1870 0%, #0d1240 38%, #060924 100%); color:#e8ecff; }
+[data-testid="stHeader"] { background:transparent; }
+[data-testid="stHeader"] button, [data-testid="stHeader"] a, [data-testid="stToolbar"] * { color:#cdd6ff !important; }
+[data-testid="stSidebar"] { background:linear-gradient(180deg,#0b1038,#140c3d); border-right:1px solid #36408f; }
+.stApp h1, .stApp h2, .stApp h3, .stApp label, .stApp label p, .stApp li,
+[data-testid="stMarkdownContainer"] p, [data-testid="stText"], [data-testid="stText"] * { color:#e8ecff !important; }
+.stApp [data-testid="stCaptionContainer"] [data-testid="stMarkdownContainer"] p, .stApp [data-testid="stCaptionContainer"] { color:#b9c3f5 !important; opacity:1; }
+[data-testid="stTextInput"] button, [data-testid="stTextInput"] button svg { color:#cdd6ff !important; fill:#cdd6ff; }
+
+.hero { display:flex; align-items:center; gap:22px; flex-wrap:wrap; padding:20px 24px; border-radius:20px;
+  background:linear-gradient(120deg,rgba(33,55,140,.65),rgba(76,29,149,.55)); border:1px solid #6d5df6;
+  box-shadow:0 0 28px rgba(109,93,246,.45); }
+.hero img { width:170px; max-width:40%; filter:drop-shadow(0 0 10px rgba(76,201,255,.65)); }
+.hero div { flex:1; min-width:220px; }
+.hero h1 { margin:0; padding:0; font-size:2rem; line-height:1.2; text-shadow:0 0 16px rgba(76,201,255,.7); }
+.hero p { margin:8px 0 0; color:#c3ccff; }
+
+[data-testid="stAlertContainer"] { background:rgba(124,58,237,.18); border:1px solid rgba(124,108,255,.8); }
+[data-testid="stAlertContainer"] p { color:#cdd6ff !important; }
+[data-testid="stFileUploaderDropzone"] { background:#10184a; border:1px dashed #6d5df6; }
+[data-testid="stFileUploaderDropzone"] * { color:#e8ecff !important; }
+[data-testid="stFileUploaderDropzone"] button { background:#2a2f7a; border:1px solid #6d5df6; }
+[data-testid="stFileChip"], [data-testid="stFileUploaderFile"] { background:#1b2362 !important; }
+[data-testid="stTextInput"] div[data-baseweb="input"], [data-testid="stTextInput"] div[data-baseweb="base-input"],
+[data-testid="stTextInputRootElement"] { background:#10184a !important; border-color:#6d5df6 !important; }
+[data-testid="stTextInput"] input { color:#ffffff !important; caret-color:#ffffff; }
+
+[data-testid="stExpander"] details { background:rgba(23,31,92,.75); border:1px solid #3f4bb0; }
+[data-testid="stExpander"] summary, [data-testid="stExpander"] summary * { color:#e8ecff !important; }
+[data-testid="stExpander"] summary, [data-testid="stExpander"] summary:hover { background:#1b2468 !important; border-color:#3f4bb0 !important; }
+.stApp [data-testid="stSidebar"] a, .stApp [data-testid="stChatMessage"] a { color:#7ee7ff !important; }
+.preview { overflow-x:auto; }
+.preview table { border-collapse:collapse; font-size:.85rem; color:#e8ecff; }
+.preview th, .preview td { border:1px solid #3f4bb0; padding:5px 10px; white-space:nowrap; }
+.preview th { background:#27307a; }
+
+[data-testid="stChatMessage"] { background:rgba(26,36,104,.78); border:1px solid #3f6fe0; border-radius:16px;
+  box-shadow:0 0 14px rgba(63,111,224,.28); padding:14px; }
+[data-testid="stChatMessage"]:has([aria-label="Chat message from user"]) { background:rgba(70,30,130,.7);
+  border-color:#a855f7; box-shadow:0 0 14px rgba(168,85,247,.32); }
+
+[data-testid="stBottom"], [data-testid="stBottom"] > div, [data-testid="stBottomBlockContainer"] { background:#080b2b !important; }
+[data-testid="stChatInput"] > div { background:#121a52 !important; border:1px solid #7c6cff !important;
+  box-shadow:0 0 18px rgba(124,108,255,.45); }
+[data-testid="stChatInput"] div { background-color:transparent; }
+[data-testid="stChatInput"] textarea { color:#ffffff !important; caret-color:#ffffff; }
+[data-testid="stChatInput"] textarea::placeholder { color:#aab4e8 !important; }
+[data-testid="stChatInput"] > div:focus-within, [data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
+  border-color:#7c6cff !important; box-shadow:0 0 18px rgba(124,108,255,.8) !important; }
+[data-testid="stExpander"] summary:hover, [data-testid="stExpander"] summary:hover * { color:#7ee7ff !important; fill:#7ee7ff !important; }
+[data-testid="stFileUploader"] button:hover, [data-testid="stFileUploader"] button:focus { border-color:#7ee7ff !important; color:#7ee7ff !important; }
+[data-testid="stButton"] button:focus, [data-testid="stButton"] button:active { border-color:#7ee7ff !important; color:#fff !important; }
+[data-testid="InputInstructions"], [data-testid="InputInstructions"] *, [data-testid="stChatInput"] [data-testid="stChatInputInstructions"] { color:#b9c3f5 !important; }
+[data-testid="stSidebarCollapseButton"] *, [data-testid="stSidebarHeader"] button * { color:#e8ecff !important; }
+[data-testid="stChatInput"] button { color:#ffffff; }
+
+/* stars */
+.stApp::before { content:""; position:fixed; inset:0; pointer-events:none; opacity:.55;
+  background-image: radial-gradient(1.5px 1.5px at 20px 30px,#fff,transparent), radial-gradient(1.5px 1.5px at 140px 110px,#7ee7ff,transparent),
+  radial-gradient(1px 1px at 90px 190px,#c4b5fd,transparent), radial-gradient(2px 2px at 230px 60px,#c4b5fd,transparent);
+  background-size:260px 230px; animation:twinkle 5s ease-in-out infinite alternate; }
+@keyframes twinkle { from { opacity:.25; } to { opacity:.7; } }
+@keyframes float { 0%,100% { transform:translateY(0) rotate(-1deg); } 50% { transform:translateY(-12px) rotate(1deg); } }
+@keyframes glow { 0%,100% { box-shadow:0 0 24px rgba(109,93,246,.45); } 50% { box-shadow:0 0 44px rgba(168,85,247,.55); } }
+
+.hero { position:relative; padding:30px 28px !important; animation:glow 5s ease-in-out infinite;
+  background:linear-gradient(120deg,rgba(30,64,175,.75),rgba(91,33,182,.7),rgba(76,29,149,.55)) !important; }
+.hero img { width:215px !important; max-width:55% !important; animation:float 4s ease-in-out infinite; }
+.stApp .hero h1 { font-size:2.4rem; text-shadow:none; background:linear-gradient(90deg,#7ee7ff,#c4b5fd,#c4b5fd);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 10px rgba(124,108,255,.8)); }
+.badges { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.badges span { padding:6px 12px; border-radius:999px; font-size:.82rem; color:#fff;
+  background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.35); }
+
+[data-testid="stButton"] button { width:100%; min-height:52px; border-radius:14px; border:1px solid rgba(255,255,255,.3);
+  background:linear-gradient(100deg,#2563eb,#7c3aed,#9333ea); box-shadow:0 0 16px rgba(124,58,237,.5);
+  transition:transform .15s, box-shadow .15s; }
+.stApp [data-testid="stButton"] button p { color:#fff !important; font-weight:600; }
+[data-testid="stButton"] button:hover { transform:translateY(-3px); box-shadow:0 0 28px rgba(168,85,247,.75); border-color:#fff; }
+[data-testid="stChatInput"] button { background:linear-gradient(135deg,#7c3aed,#9333ea) !important; border-radius:10px; }
+@media (max-width:640px) { .hero { padding:14px 16px !important; gap:8px; } .hero img { width:110px !important; }
+  .stApp .hero h1 { font-size:1.6rem; } .badges { display:none; } .hero p { font-size:.85rem; }
+  [data-testid="stButton"] button { min-height:40px; } }
+@media (prefers-reduced-motion: reduce) { .stApp::before, .hero, .hero img { animation:none !important; } }
+</style>"""
+
+# The girl robot's face, used beside the bot's messages
+FACE = ROBOT.replace('viewBox="0 0 220 190"', 'viewBox="12 4 124 114" width="64" height="64"').split('<path d="M54 114h38')[0]
+FACE += "</g>" + ROBOT[ROBOT.index('<path d="M34 55c8'):ROBOT.index('<path d="M73 147c')] + "</svg>"
+
+USER_FACE = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">'
+             '<rect width="64" height="64" rx="14" fill="#4c2889"/><circle cx="32" cy="25" r="11" fill="#7ee7ff"/>'
+             '<path d="M12 56c2-24 38-24 40 0z" fill="#7ee7ff"/></svg>')
+
+def as_picture(svg):
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+
+def show_header():
+    st.html(STYLE)
+    st.html(f'<div class="hero"><img src="{as_picture(ROBOT)}" alt="Girl robot checking a table">'
+            "<div><h1>Ishu's DataCheck Bot</h1><p>Checks a CSV table for possible problems and answers "
+            "questions about it. A prototype: always verify the answers.</p>"
+            '<div class="badges"><span>Finds data problems</span><span>Counts and averages</span>'
+            '<span>AI questions with your key</span></div></div></div>')
+
+# ---------- How to get a key ----------
+
+KEY_STEPS = """1. Open [Google AI Studio](https://aistudio.google.com/apikey).
+2. Sign in with your Google account and accept the terms.
+3. Copy the key shown there, or click **Create API key**.
+4. Paste it into **Your Gemini API key** in the left panel and press **Enter**. On a phone, open the panel with **>>**.
+
+A free tier with usage limits is available. Billing is not needed to try this app. Never share your key."""
+
+def show_text(text):
+    """The fixed key instructions get a clickable link. Everything else is shown as plain text."""
+    if text == KEY_STEPS:
+        st.markdown(text)
+    else:
+        st.text(text)
+
 def make_client(key):
     if not key:
         return None
@@ -648,19 +808,20 @@ def make_client(key):
         st.sidebar.error(f"The AI could not start ({type(error).__name__}).")
         return None
 
-st.set_page_config(page_title="Ishu's DataCheck Bot", page_icon="\U0001F4CA")
-st.title("\U0001F4CA Ishu's DataCheck Bot")
-st.caption("Checks a CSV table for possible problems and answers questions about it. "
-           "A prototype: always verify the answers.")
+AVATARS = {"assistant": as_picture(FACE), "user": as_picture(USER_FACE)}
+
+st.set_page_config(page_title="Ishu's DataCheck Bot", page_icon=as_picture(FACE))
+show_header()
 
 with st.sidebar:
     st.header("Your data")
     st.warning("Use only public or fake data. Your file is uploaded to the server that runs this app.")
     upload = st.file_uploader("Upload a CSV file (under 5 MB)", type="csv", max_upload_size=5)
     st.header("AI (optional)")
-    key = st.text_input("Your Gemini API key", type="password",
-                        help="Needed only for harder questions. This app does not save it to a file.")
-    st.caption("The AI receives your question, column names and column types, not your data rows.")
+    key = st.text_input("Your Gemini API key", type="password")
+    with st.expander("How to get a key"):
+        st.markdown(KEY_STEPS)
+    st.caption("The AI receives your question, column names and column types, not your data rows. This app does not save your key to a file.")
 
 # Which table is in use? Start a new chat when it changes.
 source = upload.file_id if upload is not None else "practice"
@@ -685,21 +846,32 @@ client = make_client(key.strip())
 st.sidebar.write("AI is **ON**." if client else "AI is **OFF**: only simple questions work.")
 
 with st.expander(f"Preview: {len(df)} rows, {len(df.columns)} columns (first 5 shown)"):
-    st.dataframe(df.head())
+    st.html(f'<div class="preview">{df.head().to_html(border=0)}</div>')
+
+clicked = None
+quick = [("Check all", "check all"), ("Summary", "summary"), ("Help", "help"),
+         ("Get a key", "get a key")]
+for column, (label, command) in zip(st.columns(4), quick):
+    if column.button(label, width="stretch"):
+        clicked = command
 
 for who, text in st.session_state.messages:
-    with st.chat_message(who):
-        st.text(text)
+    with st.chat_message(who, avatar=AVATARS[who]):
+        show_text(text)
 
-question = st.chat_input("Ask about your data", max_chars=300)
+typed = st.chat_input("Ask about your data", max_chars=300)
+question = clicked or typed
 if question and question.strip():
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar=AVATARS["user"]):
         st.text(question)
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar=AVATARS["assistant"]):
         with st.spinner("Checking..."):
             try:
-                reply = answer(question.strip(), df, client)
+                if re.fullmatch(r"(how (can i |do i |to )?)?get (a |an |the )?(api |gemini )?key *[?]?", question.strip().lower()):
+                    reply = KEY_STEPS
+                else:
+                    reply = answer(question.strip(), df, client)
             except Exception as error:
                 reply = f"Sorry, something went wrong ({type(error).__name__})."
-        st.text(reply)
+        show_text(reply)
     st.session_state.messages += [("user", question), ("assistant", reply)]
